@@ -1,3 +1,6 @@
 applications/*
+!applications/.gitkeep
 logs/*
+!logs/.gitkeep
 sftp/*
+!sftp/.gitkeep
