@@ -23,6 +23,7 @@ $SlateUri = "https://apply.mvnu.edu/manage/query/run?id=9aa20837-a0cd-44a4-a717-
 
 #Get a new Colleague API Token
 function Get-CollApiToken($Uri, $Credentials){
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls
     return Invoke-RestMethod -Method POST `
     -Uri "$Uri/session/login" -Body $Credentials `
     -ContentType "application/json"
@@ -48,6 +49,7 @@ function Get-SlateApiHeader($Credentials) {
 #region
 
 function Get-Application($Uri, $Credentials) {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     $Header = Get-SlateApiHeader $Credentials
     return Invoke-RestMethod -Method Get `
     -Uri "$Uri" `
@@ -61,6 +63,7 @@ function Get-Application($Uri, $Credentials) {
 #region
 
 function Import-Application($Uri, $Credentials, $data) {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls
     $Token = Get-CollApiToken $Uri $Credentials
     $Header = Get-CollApiHeader $Token
 
@@ -206,7 +209,7 @@ function Invoke-SFTPToSlate() {
     #Upload the files to the SFTP path
     $files = Get-ChildItem ($sftp_source_path + "/*.csv")
     foreach ($file in $files) {
-        $file = $PSScriptRoot + "/../sftp/" + $file
+        #$file = $PSScriptRoot + "/../sftp/" + $file
         Set-SFTPFile -SessionId $session.SessionId -LocalFile $file -RemotePath $sftp_destination_path
         Remove-Item -Path $file
     }
