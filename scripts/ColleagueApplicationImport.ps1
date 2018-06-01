@@ -204,7 +204,7 @@ function Invoke-SFTPToSlate() {
     $session = New-SFTPSession -ComputerName $sftp_host -Credential $credentials -AcceptKey
     
     #Upload the files to the SFTP path
-    $files = Get-ChildItem $sftp_source_path
+    $files = Get-ChildItem ($sftp_source_path + "/*.csv")
     foreach ($file in $files) {
         $file = $PSScriptRoot + "/../sftp/" + $file
         Set-SFTPFile -SessionId $session.SessionId -LocalFile $file -RemotePath $sftp_destination_path
