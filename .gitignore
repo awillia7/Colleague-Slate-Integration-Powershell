@@ -4,3 +4,4 @@ logs/*
 !logs/.gitkeep
 sftp/*
 !sftp/.gitkeep
+.env

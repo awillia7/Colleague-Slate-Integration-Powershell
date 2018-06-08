@@ -1,25 +1,30 @@
-# Authorization
+# Load values from .env and setup global variables
 #region
 
-$sftp_source_path = $PSScriptRoot + "/../sftp/"
-$sftp_destination_path = "/incoming/colleague/"
-$sftp_host = "ft.technolutions.net"
-$sftp_username = "sftpsa@apply.mvnu.edu"
-$sftp_password = "2a6349d64ed14f8bb0352b019e4fd552" | ConvertTo-SecureString -AsPlainText -Force
-
-$ColleagueCredentials = @{
-    UserId='recint'
-    Password='m61907733'
-} | ConvertTo-Json
-
-$ColleagueRootUri = "https://qaswebapi.mvnu.edu:8184/ColleagueApi"
-
-$SlateCredentials = @{
-    UserId='recint'
-    Password='m61907733'
+Get-Content ($PSScriptRoot + "/../.env") | ForEach-Object {
+    $var = $_.Split("=", 2)
+    if ($var[1]) {
+        New-Variable -Name $var[0] -Value $var[1]
+    }
 }
 
-$SlateUri = "https://apply.mvnu.edu/manage/query/run?id=9aa20837-a0cd-44a4-a717-d46c8234993a&h=8c553c0a-0744-1f42-75f0-e6212a035194&cmd=service&output=json"
+$SFTP_SOURCE_PATH = $PSScriptRoot + "/../sftp/"
+$SFTP_DESTINATION_PATH = "/incoming/colleague/"
+$SFTP_HOST = "ft.technolutions.net"
+$SFTP_USERNAME = "sftpsa@apply.mvnu.edu"
+$SFTP_PASSWORD = "2a6349d64ed14f8bb0352b019e4fd552" | ConvertTo-SecureString -AsPlainText -Force
+
+$JSON_DATA = $PSScriptRoot + "/../applications/data.json"
+
+$ColleagueCredentials = @{
+    UserId=$COLLEAGUE_USERID
+    Password=$COLLEAGUE_PASSWORD
+} | ConvertTo-Json
+
+$SlateCredentials = @{
+    UserId=$SLATE_USERID
+    Password=$SLATE_PASSWORD
+}
 
 #Get a new Colleague API Token
 function Get-CollApiToken($Uri, $Credentials){
@@ -79,13 +84,11 @@ function Import-Application($Uri, $Credentials, $data) {
 # Colleague Database Calls
 #region
 
-$sql_source = 'qascolldb1'
-$sql_database = 'coll18_test_portal'
 function Get-DatabaseID($app, $person)
 {
-    $connectionString = "Data Source=$sql_source; " +
+    $connectionString = "Data Source=$COLLEAGUE_SQL_SOURCE; " +
         "Integrated Security=SSPI; " +
-        "Initial Catalog=$sql_database"
+        "Initial Catalog=$COLLEAGUE_SQL_DATABASE"
 
     $connection = New-Object System.Data.SqlClient.SqlConnection($connectionString)
     $connection.Open()
@@ -131,10 +134,9 @@ function Get-DatabaseID($app, $person)
 # File Processing
 #region
 
-$json_data = $PSScriptRoot + "/../applications/data.json"
 function Get-ApplicationInJson($app) 
 {
-    $oldApps = Get-Content -Raw -Path $json_data | ConvertFrom-Json | Select-Object -ExpandProperty Applications
+    $oldApps = Get-Content -Raw -Path $JSON_DATA | ConvertFrom-Json | Select-Object -ExpandProperty Applications
 
     foreach ($oldApp in $oldApps) 
     {
@@ -148,7 +150,7 @@ function Get-ApplicationInJson($app)
 }
 
 function Add-SFTPFiles() {
-    $sftp_apps_data = Get-Content $json_data | ConvertFrom-Json
+    $sftp_apps_data = Get-Content $JSON_DATA | ConvertFrom-Json
     $csv_apps = @()
     $new_info = $false
     
@@ -171,11 +173,11 @@ function Add-SFTPFiles() {
     if ($new_info)
     {
         # SFTP csv file
-        $path = $sftp_source_path + "CollToSlate_$(Get-Date -f yyyy-MM-dd_HH_mm_ss).csv"
+        $path = $SFTP_SOURCE_PATH + "CollToSlate_$(Get-Date -f yyyy-MM-dd_HH_mm_ss).csv"
         $csv_apps | Export-Csv -Path $path -NoTypeInformation
         
         # Update JSON
-        $sftp_apps_data | ConvertTo-Json | Out-File -FilePath $json_data 
+        $sftp_apps_data | ConvertTo-Json | Out-File -FilePath $JSON_DATA 
     }
 }
 
@@ -189,9 +191,9 @@ function Add-ApplicationRecord($capp, $cperson, $elfBatch, $error) {
         ErpId = $null
     }
 
-    $oldApps = Get-Content -Raw -Path $json_data | ConvertFrom-Json
+    $oldApps = Get-Content -Raw -Path $JSON_DATA | ConvertFrom-Json
     $oldApps.Applications += $appData
-    $oldApps | ConvertTo-Json | Out-File -FilePath $json_data 
+    $oldApps | ConvertTo-Json | Out-File -FilePath $JSON_DATA 
 }
 #endregion
 
@@ -202,15 +204,15 @@ function Invoke-SFTPToSlate() {
     # Must install in administrator mode
     # Install-Module -Name Posh-SSH
     $credentials = New-Object -TypeName System.Management.Automation.PSCredential `
-        -ArgumentList $sftp_username,$sftp_password
+        -ArgumentList $SFTP_USERNAME,$SFTP_PASSWORD
     
-    $session = New-SFTPSession -ComputerName $sftp_host -Credential $credentials -AcceptKey
+    $session = New-SFTPSession -ComputerName $SFTP_HOST -Credential $credentials -AcceptKey
     
     #Upload the files to the SFTP path
-    $files = Get-ChildItem ($sftp_source_path + "/*.csv")
+    $files = Get-ChildItem ($SFTP_SOURCE_PATH + "/*.csv")
     foreach ($file in $files) {
         #$file = $PSScriptRoot + "/../sftp/" + $file
-        Set-SFTPFile -SessionId $session.SessionId -LocalFile $file -RemotePath $sftp_destination_path
+        Set-SFTPFile -SessionId $session.SessionId -LocalFile $file -RemotePath $SFTP_DESTINATION_PATH
         Remove-Item -Path $file
     }
 
@@ -226,10 +228,7 @@ function Invoke-SFTPToSlate() {
 # Main
 #region
 
-#$trad_email = "awillia2@mvnu.edu"
-$nt_email = "awillia2@mvnu.edu"
-
-$applications = Get-Application $SlateUri $SlateCredentials
+$applications = Get-Application $SLATE_API_URI $SlateCredentials
 foreach ($app in $applications.row)
 {
     # Need to check if application already processed
@@ -239,7 +238,7 @@ foreach ($app in $applications.row)
         # Import Application
         $data = $app | ConvertTo-Json
         $errorFlag = 0
-        $importResponse = Import-Application $ColleagueRootUri $ColleagueCredentials $data
+        $importResponse = Import-Application $COLLEAGUE_API_URI $ColleagueCredentials $data
         
         # Email Errors
         if ($importResponse.ElfErrors) {
@@ -249,7 +248,7 @@ foreach ($app in $applications.row)
             $body = "Applicant: " + $app.FirstName + " " + $app.LastName + "`nELF Batch: " + $importResponse.ElfBatch + "`nErrors:`n" + $errors
             
             # Send Email with error message
-            $email = $nt_email
+            $email = $NT_EMAIL
             Send-MailMessage -To $email -From "no-reply@mvnu.edu" -Subject "Slate Application to Colleage Import Error" -Body $body -SmtpServer "safemx.mvnu.edu"
         }
 
