@@ -11,8 +11,8 @@ Get-Content ($PSScriptRoot + "/../.env") | ForEach-Object {
 $SFTP_SOURCE_PATH = $PSScriptRoot + "/../sftp/"
 $SFTP_DESTINATION_PATH = "/incoming/colleague/"
 $SFTP_HOST = "ft.technolutions.net"
-$SFTP_USERNAME = "sftpsa@apply.mvnu.edu"
-$SFTP_PASSWORD = "2a6349d64ed14f8bb0352b019e4fd552" | ConvertTo-SecureString -AsPlainText -Force
+# Read SFTP_USERNAME, SFTP_PASSWORD, and SFTP_FLAG from .env
+$SFTP_PASSWORD = $SFTP_PASSWORD | ConvertTo-SecureString -AsPlainText -Force
 
 $JSON_DATA = $PSScriptRoot + "/../applications/data.json"
 
@@ -257,7 +257,9 @@ foreach ($app in $applications.row)
     } 
 }
 
-Add-SFTPFiles
-Invoke-SFTPToSlate
+if ($SFTP_FLAG) {
+    Add-SFTPFiles
+    Invoke-SFTPToSlate
+}
 
 #endregion
