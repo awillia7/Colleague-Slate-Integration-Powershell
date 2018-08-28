@@ -12,7 +12,7 @@ $SFTP_SOURCE_PATH = $PSScriptRoot + "/../sftp/"
 $SFTP_DESTINATION_PATH = "/incoming/colleague/"
 $SFTP_HOST = "ft.technolutions.net"
 # Read SFTP_USERNAME, SFTP_PASSWORD, and SFTP_FLAG from .env
-$SFTP_PASSWORD = $SFTP_PASSWORD | ConvertTo-SecureString -AsPlainText -Force
+$SFTP_SECURE_PASSWORD = $SFTP_PASSWORD | ConvertTo-SecureString -AsPlainText -Force
 
 $JSON_DATA = $PSScriptRoot + "/../applications/data.json"
 
@@ -204,7 +204,7 @@ function Invoke-SFTPToSlate() {
     # Must install in administrator mode
     # Install-Module -Name Posh-SSH
     $credentials = New-Object -TypeName System.Management.Automation.PSCredential `
-        -ArgumentList $SFTP_USERNAME,$SFTP_PASSWORD
+        -ArgumentList $SFTP_USERNAME,$SFTP_SECURE_PASSWORD
     
     $session = New-SFTPSession -ComputerName $SFTP_HOST -Credential $credentials -AcceptKey
     
@@ -225,10 +225,52 @@ function Invoke-SFTPToSlate() {
 
 #endregion
 
-# Main
+# TRAD Process
 #region
 
-$applications = Get-Application $SLATE_API_URI $SlateCredentials
+$applications = Get-Application $SLATE_TRADAPP_API_URI $SlateCredentials
+foreach ($app in $applications.row)
+{
+    
+    # Need to check if application already processed
+    $need_to_import = -Not (Get-ApplicationInJson $app.CrmApplicationId);
+
+    if ($need_to_import) {
+        Write-Host $app.AcademicProgram
+        # Import Application
+        $data = $app | ConvertTo-Json
+        $errorFlag = 0
+        
+        $importResponse = Import-Application $COLLEAGUE_API_URI $ColleagueCredentials $data
+
+        # Email Errors
+        if ($importResponse.ElfErrors) {
+            $errors = $importResponse.ElfErrors -replace '~','`n'
+            $errorFlag = 1
+            
+            $body = "Applicant: " + $app.FirstName + " " + $app.LastName + "`nELF Batch: " + $importResponse.ElfBatch + "`nErrors:`n" + $errors
+            
+            # Send Email with error message
+            if ($app.AcademicProgram -eq 'PSEO.TRD.ND') {
+                $email = $CCP_EMAIL
+            } else {
+                $email = $TRAD_EMAIL
+            }
+            
+            Send-MailMessage -To $email -From "no-reply@mvnu.edu" -Subject "Slate Application to Colleage Import Error" -Body $body -SmtpServer "safemx.mvnu.edu"
+        }
+
+        # Record imported file
+        Add-ApplicationRecord $app.CrmApplicationId $app.CrmPersonId $importResponse.ElfBatch $errorFlag
+    } 
+}
+
+#endregion
+
+# NTD Process
+#region
+
+$applications = Get-Application $SLATE_NTAPP_API_URI $SlateCredentials
 foreach ($app in $applications.row)
 {
     # Need to check if application already processed
@@ -257,7 +299,12 @@ foreach ($app in $applications.row)
     } 
 }
 
-if ($SFTP_FLAG) {
+#endregion
+
+# Colleague to Slate Process
+#region
+
+if ($SFTP_FLAG -eq 1) {
     Add-SFTPFiles
     Invoke-SFTPToSlate
 }
