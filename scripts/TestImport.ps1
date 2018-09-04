@@ -13,7 +13,7 @@ Get-Content ($PSScriptRoot + "/../.env") | ForEach-Object {
 #$SFTP_HOST = "ft.technolutions.net"
 #$SFTP_SECURE_PASSWORD = $SFTP_PASSWORD | ConvertTo-SecureString -AsPlainText -Force
 
-#$JSON_DATA = $PSScriptRoot + "/../applications/data.json"
+$JSON_DATA = $PSScriptRoot + "/../test_scores/data.json"
 
 $ColleagueCredentials = @{
     UserId=$COLLEAGUE_USERID
@@ -70,7 +70,7 @@ function Import-TestScore($Uri, $Credentials, $data) {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls
     $Token = Get-CollApiToken $Uri $Credentials
     $Header = Get-CollApiHeader $Token
-    Write-Host "Post Test Score" 
+
     return Invoke-RestMethod -Method Post `
     -Uri "$Uri/recruiter-test-scores" `
     -Body $data `
@@ -80,8 +80,38 @@ function Import-TestScore($Uri, $Credentials, $data) {
 
 #endregion
 
-# SFTP to Slate
+# File Processing
 #region
+
+function Get-TestScoreInJson($ts) 
+{
+    $oldTestScores = Get-Content -Raw -Path $JSON_DATA | ConvertFrom-Json | Select-Object -ExpandProperty TestScores
+
+    foreach ($oldTestScore in $oldTestScores) 
+    {
+        if ($oldTestScore.TestId -eq $ts.TestId -and $oldTestScore.SubtestType -eq $ts.SubtestType) 
+        {
+            return $true
+        }
+    }
+    
+    return $false
+}
+
+function Add-TestRecord($ts) {
+    $testData = @{
+        TestId = $ts.TestId
+        ErpId = $ts.ErpProspectId
+        ImportDate = Get-Date -Format d
+        SubtestType = $ts.SubtestType
+        #ELFBatch = $elfBatch
+        #Error = $error
+    }
+    
+    $oldApps = Get-Content -Raw -Path $JSON_DATA | ConvertFrom-Json
+    $oldApps.TestScores += $testData
+    $oldApps | ConvertTo-Json | Out-File -FilePath $JSON_DATA 
+}
 
 #endregion
 
@@ -89,20 +119,22 @@ function Import-TestScore($Uri, $Credentials, $data) {
 #region
 
 $testScores = Get-TestScores $SLATE_TEST_SCORES_API_URI $SlateCredentials
+
 foreach ($score in $testScores.row)
 {
     # Need to check if application already processed
-    # Need to write this check, simply set at 1 for now
-    $need_to_import = 1;
+    $need_to_import = Get-TestScoreInJson($score)
 
-    if ($need_to_import) {
+    if (-Not $need_to_import) {
+
         # Import Application
         $data = $score | ConvertTo-Json
-        $errorFlag = 0
-        $importResponse = Import-TestScore $COLLEAGUE_API_URI $ColleagueCredentials $data
+        #$errorFlag = 0
+        #$importResponse = Import-TestScore $COLLEAGUE_API_URI $ColleagueCredentials $data
+        Import-TestScore $COLLEAGUE_API_URI $ColleagueCredentials $data
 
         # Record imported file
-        #Add-ApplicationRecord $app.CrmApplicationId $app.CrmPersonId $importResponse.ElfBatch $errorFlag
+        Add-TestRecord $score
     } 
 }
 
