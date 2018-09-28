@@ -55,10 +55,17 @@ function Get-SlateApiHeader($Credentials) {
 function Get-TestScores($Uri, $Credentials) {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     $Header = Get-SlateApiHeader $Credentials
-    return Invoke-RestMethod -Method Get `
-    -Uri "$Uri" `
-    -Headers $Header `
-    -ContentType "application/json"
+
+    try {
+        $result = Invoke-RestMethod -Method Get `
+        -Uri "$Uri" `
+        -Headers $Header `
+        -ContentType "application/json"
+    } catch {
+        $result = $null
+    }
+
+    return $result
 }
 
 #endregion
@@ -68,14 +75,20 @@ function Get-TestScores($Uri, $Credentials) {
 
 function Import-TestScore($Uri, $Credentials, $data) {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls
-    $Token = Get-CollApiToken $Uri $Credentials
-    $Header = Get-CollApiHeader $Token
+    try {
+        $Token = Get-CollApiToken $Uri $Credentials
+        $Header = Get-CollApiHeader $Token
 
-    return Invoke-RestMethod -Method Post `
-    -Uri "$Uri/recruiter-test-scores" `
-    -Body $data `
-    -Headers $Header `
-    -ContentType "application/json"
+        $result = Invoke-RestMethod -Method Post `
+        -Uri "$Uri/recruiter-test-scores" `
+        -Body $data `
+        -Headers $Header `
+        -ContentType "application/json"
+    } catch {
+        $result = $null
+    }
+
+    return $result
 }
 
 #endregion
@@ -123,18 +136,18 @@ $testScores = Get-TestScores $SLATE_TEST_SCORES_API_URI $SlateCredentials
 foreach ($score in $testScores.row)
 {
     # Need to check if application already processed
-    $need_to_import = Get-TestScoreInJson($score)
-
-    if (-Not $need_to_import) {
-
+    $need_to_import = -Not (Get-TestScoreInJson($score))
+    
+    if ($need_to_import) {
+        
         # Import Application
         $data = $score | ConvertTo-Json
-        #$errorFlag = 0
-        #$importResponse = Import-TestScore $COLLEAGUE_API_URI $ColleagueCredentials $data
-        Import-TestScore $COLLEAGUE_API_URI $ColleagueCredentials $data
+        $importResponse = Import-TestScore $COLLEAGUE_API_URI $ColleagueCredentials $data
 
         # Record imported file
-        Add-TestRecord $score
+        if ($importResponse -ne $null) {
+            Add-TestRecord $score
+        }
     } 
 }
 

@@ -56,10 +56,15 @@ function Get-SlateApiHeader($Credentials) {
 function Get-Application($Uri, $Credentials) {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     $Header = Get-SlateApiHeader $Credentials
-    return Invoke-RestMethod -Method Get `
-    -Uri "$Uri" `
-    -Headers $Header `
-    -ContentType "application/json"
+    try {
+        $result = Invoke-RestMethod -Method Get `
+        -Uri "$Uri" `
+        -Headers $Header `
+        -ContentType "application/json"
+    } catch {
+        $result = $null
+    }
+    return $result
 }
 
 #endregion
@@ -69,14 +74,20 @@ function Get-Application($Uri, $Credentials) {
 
 function Import-Application($Uri, $Credentials, $data) {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls
-    $Token = Get-CollApiToken $Uri $Credentials
-    $Header = Get-CollApiHeader $Token
+    
+    try {
+        $Token = Get-CollApiToken $Uri $Credentials
+        $Header = Get-CollApiHeader $Token
 
-    return Invoke-RestMethod -Method Post `
-    -Uri "$Uri/crm-applications" `
-    -Body $data `
-    -Headers $Header `
-    -ContentType "application/json"
+        $result = Invoke-RestMethod -Method Post `
+        -Uri "$Uri/crm-applications" `
+        -Body $data `
+        -Headers $Header `
+        -ContentType "application/json"
+    } catch {
+        $result = $null
+    }
+    return $result
 }
 
 #endregion
@@ -236,7 +247,7 @@ foreach ($app in $applications.row)
     $need_to_import = -Not (Get-ApplicationInJson $app.CrmApplicationId);
 
     if ($need_to_import) {
-        Write-Host $app.AcademicProgram
+        
         # Import Application
         $data = $app | ConvertTo-Json
         $errorFlag = 0
@@ -261,7 +272,9 @@ foreach ($app in $applications.row)
         }
 
         # Record imported file
-        Add-ApplicationRecord $app.CrmApplicationId $app.CrmPersonId $importResponse.ElfBatch $errorFlag
+        if ($importResponse -ne $null) {
+            Add-ApplicationRecord $app.CrmApplicationId $app.CrmPersonId $importResponse.ElfBatch $errorFlag
+        }
     } 
 }
 
@@ -277,6 +290,7 @@ foreach ($app in $applications.row)
     $need_to_import = -Not (Get-ApplicationInJson $app.CrmApplicationId);
 
     if ($need_to_import) {
+        
         # Import Application
         $data = $app | ConvertTo-Json
         $errorFlag = 0
@@ -295,7 +309,9 @@ foreach ($app in $applications.row)
         }
 
         # Record imported file
-        Add-ApplicationRecord $app.CrmApplicationId $app.CrmPersonId $importResponse.ElfBatch $errorFlag
+        if ($importResponse -ne $null) {
+            Add-ApplicationRecord $app.CrmApplicationId $app.CrmPersonId $importResponse.ElfBatch $errorFlag
+        }
     } 
 }
 
