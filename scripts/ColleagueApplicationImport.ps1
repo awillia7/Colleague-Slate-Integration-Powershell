@@ -9,8 +9,7 @@ Get-Content ($PSScriptRoot + "/../.env") | ForEach-Object {
 }
 
 $SFTP_SOURCE_PATH = $PSScriptRoot + "/../sftp/"
-$SFTP_DESTINATION_PATH = "/incoming/colleague/"
-$SFTP_HOST = "ft.technolutions.net"
+$SFTP_DESTINATION_PATH = "/incoming/colleague/applications/"
 # Read SFTP_USERNAME, SFTP_PASSWORD, and SFTP_FLAG from .env
 $SFTP_SECURE_PASSWORD = $SFTP_PASSWORD | ConvertTo-SecureString -AsPlainText -Force
 
@@ -84,9 +83,11 @@ function Import-Application($Uri, $Credentials, $data) {
         -Body $data `
         -Headers $Header `
         -ContentType "application/json"
+        
     } catch {
         $result = $null
     }
+    
     return $result
 }
 
@@ -206,6 +207,7 @@ function Add-ApplicationRecord($capp, $cperson, $elfBatch, $error) {
     $oldApps.Applications += $appData
     $oldApps | ConvertTo-Json | Out-File -FilePath $JSON_DATA 
 }
+
 #endregion
 
 # SFTP to Slate
@@ -220,7 +222,7 @@ function Invoke-SFTPToSlate() {
     $session = New-SFTPSession -ComputerName $SFTP_HOST -Credential $credentials -AcceptKey
     
     #Upload the files to the SFTP path
-    $files = Get-ChildItem ($SFTP_SOURCE_PATH + "/*.csv")
+    $files = Get-ChildItem  -Path $SFTP_SOURCE_PATH -Filter "CollToSlate*.csv"
     foreach ($file in $files) {
         #$file = $PSScriptRoot + "/../sftp/" + $file
         Set-SFTPFile -SessionId $session.SessionId -LocalFile $file -RemotePath $SFTP_DESTINATION_PATH
