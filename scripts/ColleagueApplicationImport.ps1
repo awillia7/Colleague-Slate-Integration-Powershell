@@ -10,7 +10,6 @@ Get-Content ($PSScriptRoot + "/../.env") | ForEach-Object {
 
 $SFTP_SOURCE_PATH = $PSScriptRoot + "/../sftp/"
 $SFTP_DESTINATION_PATH = "/incoming/colleague/applications/"
-# Read SFTP_USERNAME, SFTP_PASSWORD, and SFTP_FLAG from .env
 $SFTP_SECURE_PASSWORD = $SFTP_PASSWORD | ConvertTo-SecureString -AsPlainText -Force
 
 $JSON_DATA = $PSScriptRoot + "/../applications/data.json"
