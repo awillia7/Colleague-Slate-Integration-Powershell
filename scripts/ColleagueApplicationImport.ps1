@@ -225,7 +225,6 @@ function Invoke-SFTPToSlate() {
     foreach ($file in $files) {
         #$file = $PSScriptRoot + "/../sftp/" + $file
         $file = "../sftp/" + $file
-        Write-Output $file
         Set-SFTPFile -SessionId $session.SessionId -LocalFile $file -RemotePath $SFTP_DESTINATION_PATH
         Remove-Item -Path $file
     }
