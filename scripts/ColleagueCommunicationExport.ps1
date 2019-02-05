@@ -39,7 +39,7 @@ function Get-SQLData($sql, $source, $database) {
 function Get-ColleagueCommunication() {
     # Query communication information
     $year = $FA_FILE_SUITE.Substring($FA_FILE_SUITE.length - 2, 2)
-    $codes = "'FAC" + $year + "RAL', 'FAC" + $year + "AL', 'FAC" + $year + "ISIR'"
+    $codes = "'FAC" + $year + "RAL', 'FAC" + $year + "AL', 'FAC" + $year + "ISR'"
     $sql = @"
 SELECT aro.APP_REC_CRM_IDS AS [SLATE_ID]
   , MAILING_CORR_RECEIVED
