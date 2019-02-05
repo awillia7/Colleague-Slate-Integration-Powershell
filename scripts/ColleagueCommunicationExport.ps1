@@ -14,16 +14,32 @@ $SFTP_SECURE_PASSWORD = $SFTP_PASSWORD | ConvertTo-SecureString -AsPlainText -Fo
 
 #endregion
 
-# Colleague Database Calls
+# Database Queries
 #region
 
-function Get-ColleagueCommunication()
-{
-    $connectionString = "Data Source=$COLLEAGUE_SQL_SOURCE; " +
+function Get-SQLData($sql, $source, $database) {
+    $connectionString = "Data Source=$source; " +
         "Integrated Security=SSPI; " +
-        "Initial Catalog=$COLLEAGUE_SQL_DATABASE"
+        "Initial Catalog=$database"
 
+    $SqlConnection = New-Object System.Data.SqlClient.SqlConnection
+    $SqlConnection.ConnectionString = $connectionString
+    $SqlCmd = New-Object System.Data.SqlClient.SqlCommand
+    $SqlCmd.CommandText = $sql
+    $SqlCmd.Connection = $SqlConnection
+    $SqlAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
+    $SqlAdapter.SelectCommand = $SqlCmd
+    $dataset = New-Object System.Data.DataSet
+    $SqlAdapter.Fill($dataset)
+    $SqlConnection.Close()
+
+    return $dataset
+}
+
+function Get-ColleagueCommunication() {
     # Query communication information
+    $year = $FA_FILE_SUITE.Substring($FA_FILE_SUITE.length - 2, 2)
+    $codes = "'FAC" + $year + "RAL', 'FAC" + $year + "AL', 'FAC" + $year + "ISIR'"
     $sql = @"
 SELECT aro.APP_REC_CRM_IDS AS [SLATE_ID]
   , MAILING_CORR_RECEIVED
@@ -37,25 +53,220 @@ FROM CH_CORR
     AND APP_REC_ORG_IDS = 'SLATE'
   INNER JOIN VALS AS v ON v.VAL_INTERNAL_CODE = CH_CORR.MAILING_CORR_RECVD_STATUS
     AND v.VALCODE_ID = 'CORR.STATUSES'
-WHERE MAILING_CORR_RECEIVED IN ('FAC19RAL', 'FAC19AL', 'FAC19ISR')
+WHERE MAILING_CORR_RECEIVED IN ($codes)
   AND v.VAL_ACTION_CODE_1 IN (1, 2);
 "@
 
-    $SqlConnection = New-Object System.Data.SqlClient.SqlConnection
-    $SqlConnection.ConnectionString = $connectionString
-    $SqlCmd = New-Object System.Data.SqlClient.SqlCommand
-    $SqlCmd.CommandText = $sql
-    $SqlCmd.Connection = $SqlConnection
-    $SqlAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-    $SqlAdapter.SelectCommand = $SqlCmd
-    $DataSet = New-Object System.Data.DataSet
-    $SqlAdapter.Fill($DataSet)
-    $SqlConnection.Close()
-    #$data = $dataset.Tables[0]
-    
-    return $dataset
+    return Get-SQLData -sql $sql -source $COLLEAGUE_SQL_SOURCE -database $COLLEAGUE_SQL_DATABASE
 }
 
+function Get-ColleagueMPNData() {
+    # Query MPN status
+    $sql = @"
+    WITH last_direct_loan AS (
+    SELECT DLIA_STUDENT_ID AS ID
+    ,  MAX(DLIA_AWARD_CREATE_DATE) AS LAST_LOAN_DATE
+    FROM DLI_AWARD AS direct_loan
+    INNER JOIN APP_REC_ORGS AS aro ON aro.APPLICANTS_ID = direct_loan.DLIA_STUDENT_ID
+        AND APP_REC_ORG_IDS = 'SLATE'
+    WHERE DLIA_AWARD_YEAR = '$FA_FILE_SUITE'
+    GROUP BY DLIA_STUDENT_ID
+    )
+    SELECT DISTINCT aro.APP_REC_CRM_IDS AS [SLATE_ID]
+    , 'trad_mpn' AS [MAILING_CORR_RECEIVED]
+    , last_direct_loan.LAST_LOAN_DATE AS [MAILING_CORR_RECVD_ASGN_DT]
+    , CASE
+        WHEN DLIA_MPN_STATUS = 'A' THEN 'Complete'
+        WHEN DLIA_MPN_STATUS = 'R' THEN 'Incomplete'
+        ELSE 'Incomplete'
+    END AS [MAILING_CORR_RECVD_STATUS]
+    FROM DLI_AWARD AS direct_loan
+    INNER JOIN last_direct_loan ON last_direct_loan.ID = direct_loan.DLIA_STUDENT_ID
+        AND last_direct_loan.LAST_LOAN_DATE = direct_loan.DLIA_AWARD_CREATE_DATE
+    INNER JOIN APP_REC_ORGS AS aro ON aro.APPLICANTS_ID = direct_loan.DLIA_STUDENT_ID
+        AND APP_REC_ORG_IDS = 'SLATE'
+    INNER JOIN APPLICATIONS AS a ON direct_loan.DLIA_STUDENT_ID = a.APPL_APPLICANT
+        AND a.APPL_START_TERM IN ('$TRAD_APP_TERM')
+    WHERE DLIA_AWARD_YEAR = '$FA_FILE_SUITE'
+    AND a.APPL_APPLICANT IN (
+        '0354815'
+        , '0354879'
+        , '0414777'
+        , '0417155'
+        , '0427535'
+        , '0431167'
+        , '0431646'
+        , '0432952'
+        , '0435032'
+        , '0441383'
+    );
+"@
+
+    return Get-SQLData -sql $sql -source $COLLEAGUE_SQL_SOURCE -database $COLLEAGUE_SQL_DATABASE
+}
+
+function Get-ColleagueEntranceCounseling {
+    # Query MPN status
+    $sql = @"
+    WITH interview_date AS (
+    SELECT FAIN_STUDENT_ID
+    , MAX(ISNULL(FA_INTERVIEW_ADDDATE, FAIN_ENTRANCE_COMMENT_DATE)) AS INTERVIEW_DATE
+    FROM FA_INTERVIEW
+    WHERE FAIN_LOAN_CODE = 'SUB'
+      AND FAIN_STUDENT_ID IS NOT NULL
+    GROUP BY FAIN_STUDENT_ID
+    )
+    SELECT aro.APP_REC_CRM_IDS AS [SLATE_ID]
+    , 'trad_counseling' AS [MAILING_CORR_RECEIVED]
+    , interview_date.INTERVIEW_DATE [MAILING_CORR_RECVD_ASGN_DT]
+    , CONVERT(NVARCHAR, interview_date.INTERVIEW_DATE, 101) AS [MAILING_CORR_RECVD_STATUS]
+    FROM interview_date
+    INNER JOIN APP_REC_ORGS AS aro ON aro.APPLICANTS_ID = interview_date.FAIN_STUDENT_ID
+        AND APP_REC_ORG_IDS = 'SLATE'
+    INNER JOIN APPLICATIONS AS a ON interview_date.FAIN_STUDENT_ID = a.APPL_APPLICANT
+        AND a.APPL_START_TERM IN ('$TRAD_APP_TERM')
+    WHERE a.APPL_APPLICANT IN (
+        '0354815'
+        , '0354879'
+        , '0414777'
+        , '0417155'
+        , '0427535'
+        , '0431167'
+        , '0431646'
+        , '0432952'
+        , '0435032'
+        , '0441383'
+    );
+"@
+
+    return Get-SQLData -sql $sql -source $COLLEAGUE_SQL_SOURCE -database $COLLEAGUE_SQL_DATABASE
+}
+
+function Get-ColleagueAwardStatus {
+    # Query Award Status
+    $ta_suite = 'TA_{0}' -f $FA_FILE_SUITE
+    $ta_id = '{0}_ID' -f $ta_suite
+    $sql = @"
+    WITH award_status AS (
+    SELECT LEFT($ta_id, 7) AS TA_PERSON_ID
+    , MAX(TA_TERM_ACTION_DATE) AS TERM_ACTION_DATE
+    , MAX(TA_TERM_ACTION) AS TERM_ACTION
+    FROM $ta_suite
+    WHERE ($ta_id LIKE '%*FDLU*%'
+    OR $ta_id LIKE '%*FDLU2*%'
+    OR $ta_id LIKE '%*FDLU3*%'
+    OR $ta_id LIKE '%*FDLU4*%'
+    OR $ta_id LIKE '%*FDLU5*%'
+    OR $ta_id LIKE '%*FDLU6*%'
+    OR $ta_id LIKE '%*FDLS*%'
+    OR $ta_id LIKE '%*FDLS2*%'
+    OR $ta_id LIKE '%*FDLS3*%'
+    OR $ta_id LIKE '%*FDLS4*%'
+    OR $ta_id LIKE '%*FDLS5*%')
+    GROUP BY LEFT($ta_id, 7)
+    )
+    SELECT aro.APP_REC_CRM_IDS AS [SLATE_ID]
+    , 'trad_awardstatus' AS [MAILING_CORR_RECEIVED]
+    , TERM_ACTION_DATE AS [MAILING_CORR_RECVD_ASGN_DT] 
+    , CASE
+        WHEN award_status.TERM_ACTION = 'O' THEN 'Incomplete'
+        WHEN award_status.TERM_ACTION = 'R' THEN 'Rejected'
+        WHEN award_status.TERM_ACTION = 'C' THEN 'Rejected'
+        WHEN award_status.TERM_ACTION = 'S' THEN 'Accepted'
+        WHEN award_status.TERM_ACTION = 'A' THEN 'Accepted'
+    END AS [MAILING_CORR_RECVD_STATUS]
+    FROM award_status
+    INNER JOIN APP_REC_ORGS AS aro ON aro.APPLICANTS_ID = award_status.TA_PERSON_ID
+        AND APP_REC_ORG_IDS = 'SLATE'
+    INNER JOIN APPLICATIONS AS a ON award_status.TA_PERSON_ID = a.APPL_APPLICANT
+        AND a.APPL_START_TERM IN ('$TRAD_APP_TERM')
+        AND award_status.TERM_ACTION <> 'O'
+    WHERE a.APPL_APPLICANT IN (
+        '0354815'
+        , '0354879'
+        , '0414777'
+        , '0417155'
+        , '0427535'
+        , '0431167'
+        , '0431646'
+        , '0432952'
+        , '0435032'
+        , '0441383'
+    );
+"@
+
+    return Get-SQLData -sql $sql -source $COLLEAGUE_SQL_SOURCE -database $COLLEAGUE_SQL_DATABASE
+}
+
+# Get Username and Initial Passwords
+function Get-ColleagueAuthenication {
+    #Query username info
+    $sql = @"
+    SELECT aro.APP_REC_CRM_IDS AS [SLATE_ID]
+    , 'trad_login' AS [MAILING_CORR_RECEIVED]
+    , ORG_ENTITY_ENV_ADDDATE AS [MAILING_CORR_RECVD_ASGN_DT]
+    , OEE_USERNAME AS [MAILING_CORR_RECVD_STATUS]
+    FROM ORG_ENTITY_ENV
+    INNER JOIN APP_REC_ORGS AS aro ON aro.APPLICANTS_ID = OEE_RESOURCE
+        AND APP_REC_ORG_IDS = 'SLATE'
+    INNER JOIN APPLICATIONS AS a ON OEE_RESOURCE = a.APPL_APPLICANT
+        AND a.APPL_START_TERM IN ('$TRAD_APP_TERM')
+    WHERE a.APPL_APPLICANT IN (
+        '0354815'
+        , '0354879'
+        , '0414777'
+        , '0417155'
+        , '0427535'
+        , '0431167'
+        , '0431646'
+        , '0432952'
+        , '0435032'
+        , '0441383'
+    );
+"@
+    $auth_dataset = Get-SQLData -sql $sql -source $COLLEAGUE_SQL_SOURCE -database $COLLEAGUE_SQL_DATABASE
+
+    # Loop through usernames and get password info from CROA
+    $pw_dataset = $null
+    foreach ($row in $auth_dataset.Tables[0].Rows) {
+        $slate_id = $row.SLATE_ID
+        $username = $row.MAILING_CORR_RECVD_STATUS
+        $auth_date = $row.MAILING_CORR_RECVD_ASGN_DT
+        $sql = @"
+        SELECT '$slate_id' AS [SLATE_ID]
+        , 'trad_password' AS [MAILING_CORR_RECEIVED]
+        , CONVERT(DATE, '$auth_date') AS [MAILING_CORR_RECVD_ASGN_DT]
+        , INITIAL_PASSWORD AS [MAILING_CORR_RECVD_STATUS]
+        FROM X_AD_CRED
+        WHERE PERSON_PIN_USER_ID = '$username'
+        AND PERSON_PIN_ID IN (
+            '0354815'
+            , '0354879'
+            , '0414777'
+            , '0417155'
+            , '0427535'
+            , '0431167'
+            , '0431646'
+            , '0432952'
+            , '0435032'
+            , '0441383'
+        );
+"@
+
+        if ($pw_dataset) {
+            $pw = Get-SQLData -sql $sql -source $ODS_SQL_SOURCE -database $ODS_SQL_DATABASE
+            $pw_dataset.Tables[0].Merge($pw.Tables[0])
+        } else {
+            $pw_dataset = Get-SQLData -sql $sql -source $ODS_SQL_SOURCE -database $ODS_SQL_DATABASE
+        }
+    }
+
+    if ($pw_dataset) {
+        $auth_dataset.Tables[0].Merge($pw_dataset.Tables[0])
+    }
+
+    return $auth_dataset
+}
 #endregion
 
 # SFTP to Slate
@@ -90,6 +301,19 @@ function Invoke-SFTPToSlate($sftp_filter) {
 #region
 
 $dataset = Get-ColleagueCommunication
+
+$mpn_data = Get-ColleagueMPNData
+$dataset.Tables[0].Merge($mpn_data.Tables[0])
+
+$entrance_counseling = Get-ColleagueEntranceCounseling
+$dataset.Tables[0].Merge($entrance_counseling.Tables[0])
+
+$award_status = Get-ColleagueAwardStatus
+$dataset.Tables[0].Merge($award_status.Tables[0])
+
+$colleague_auth = Get-ColleagueAuthenication
+$dataset.Tables[0].Merge($colleague_auth.Tables[0])
+
 if ($dataset.Tables[0].Rows.Count -gt 0)
 {
     $path = $SFTP_SOURCE_PATH + "CollCommToSlate_$(Get-Date -f yyyy-MM-dd_HH_mm_ss).csv"
