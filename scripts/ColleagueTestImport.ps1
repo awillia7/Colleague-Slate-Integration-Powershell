@@ -73,21 +73,25 @@ function Get-TestScores($Uri, $Credentials) {
 # Colleague Web API Calls
 #region
 
-function Import-TestScore($Uri, $Credentials, $data) {
+function Import-TestScore($uri, $credentials, $data) {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls
     try {
-        $Token = Get-CollApiToken $Uri $Credentials
-        $Header = Get-CollApiHeader $Token
+        $token = Get-CollApiToken $uri $credentials
+        $header = Get-CollApiHeader $token
 
         $result = Invoke-RestMethod -Method Post `
-        -Uri "$Uri/recruiter-test-scores" `
+        -Uri "$uri/recruiter-test-scores" `
         -Body $data `
-        -Headers $Header `
+        -Headers $header `
         -ContentType "application/json"
     } catch {
         $result = $null
+        Write-Host "StatusCode:" $_.Exception.Response.StatusCode.value__ 
+        Write-Host "StatusDescription:" $_.Exception.Response.StatusDescription
     }
-
+    Write-Host "Token: $token"
+    Write-Host "Header: $header"
+    Write-Host "Result: $result"
     return $result
 }
 
@@ -211,6 +215,7 @@ foreach ($score in $testScores.row)
         Write-Host "$importResponse"
         # Record imported file
         if ($null -ne $importResponse) {
+            Write-Host "Adding record"
             Add-TestRecord $score
         }
     } 
