@@ -86,12 +86,8 @@ function Import-TestScore($uri, $credentials, $data) {
         -ContentType "application/json"
     } catch {
         $result = $null
-        Write-Host "StatusCode:" $_.Exception.Response.StatusCode.value__ 
-        Write-Host "StatusDescription:" $_.Exception.Response.StatusDescription
     }
-    Write-Host "Token: $token"
-    Write-Host "Header: $header"
-    Write-Host "Result: $result"
+    
     return $result
 }
 
@@ -210,12 +206,12 @@ foreach ($score in $testScores.row)
         # Import Application
         #$scoreImported = $true
         $data = $score | ConvertTo-Json
-        Write-Host "$data"
+        
         $importResponse = Import-TestScore $COLLEAGUE_API_URI $ColleagueCredentials $data
-        Write-Host "$importResponse"
+        
         # Record imported file
         if ($null -ne $importResponse) {
-            Write-Host "Adding record"
+            
             Add-TestRecord $score
         }
     } 
