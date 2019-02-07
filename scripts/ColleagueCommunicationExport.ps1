@@ -87,19 +87,7 @@ function Get-ColleagueMPNData() {
         AND APP_REC_ORG_IDS = 'SLATE'
     INNER JOIN APPLICATIONS AS a ON direct_loan.DLIA_STUDENT_ID = a.APPL_APPLICANT
         AND a.APPL_START_TERM IN ('$TRAD_APP_TERM')
-    WHERE DLIA_AWARD_YEAR = '$FA_FILE_SUITE'
-    AND a.APPL_APPLICANT IN (
-        '0354815'
-        , '0354879'
-        , '0414777'
-        , '0417155'
-        , '0427535'
-        , '0431167'
-        , '0431646'
-        , '0432952'
-        , '0435032'
-        , '0441383'
-    );
+    WHERE DLIA_AWARD_YEAR = '$FA_FILE_SUITE';
 "@
 
     return Get-SQLData -sql $sql -source $COLLEAGUE_SQL_SOURCE -database $COLLEAGUE_SQL_DATABASE
@@ -124,19 +112,7 @@ function Get-ColleagueEntranceCounseling {
     INNER JOIN APP_REC_ORGS AS aro ON aro.APPLICANTS_ID = interview_date.FAIN_STUDENT_ID
         AND APP_REC_ORG_IDS = 'SLATE'
     INNER JOIN APPLICATIONS AS a ON interview_date.FAIN_STUDENT_ID = a.APPL_APPLICANT
-        AND a.APPL_START_TERM IN ('$TRAD_APP_TERM')
-    WHERE a.APPL_APPLICANT IN (
-        '0354815'
-        , '0354879'
-        , '0414777'
-        , '0417155'
-        , '0427535'
-        , '0431167'
-        , '0431646'
-        , '0432952'
-        , '0435032'
-        , '0441383'
-    );
+        AND a.APPL_START_TERM IN ('$TRAD_APP_TERM');
 "@
 
     return Get-SQLData -sql $sql -source $COLLEAGUE_SQL_SOURCE -database $COLLEAGUE_SQL_DATABASE
@@ -180,19 +156,7 @@ function Get-ColleagueAwardStatus {
         AND APP_REC_ORG_IDS = 'SLATE'
     INNER JOIN APPLICATIONS AS a ON award_status.TA_PERSON_ID = a.APPL_APPLICANT
         AND a.APPL_START_TERM IN ('$TRAD_APP_TERM')
-        AND award_status.TERM_ACTION <> 'O'
-    WHERE a.APPL_APPLICANT IN (
-        '0354815'
-        , '0354879'
-        , '0414777'
-        , '0417155'
-        , '0427535'
-        , '0431167'
-        , '0431646'
-        , '0432952'
-        , '0435032'
-        , '0441383'
-    );
+        AND award_status.TERM_ACTION <> 'O';
 "@
 
     return Get-SQLData -sql $sql -source $COLLEAGUE_SQL_SOURCE -database $COLLEAGUE_SQL_DATABASE
@@ -210,19 +174,7 @@ function Get-ColleagueAuthenication {
     INNER JOIN APP_REC_ORGS AS aro ON aro.APPLICANTS_ID = OEE_RESOURCE
         AND APP_REC_ORG_IDS = 'SLATE'
     INNER JOIN APPLICATIONS AS a ON OEE_RESOURCE = a.APPL_APPLICANT
-        AND a.APPL_START_TERM IN ('$TRAD_APP_TERM')
-    WHERE a.APPL_APPLICANT IN (
-        '0354815'
-        , '0354879'
-        , '0414777'
-        , '0417155'
-        , '0427535'
-        , '0431167'
-        , '0431646'
-        , '0432952'
-        , '0435032'
-        , '0441383'
-    );
+        AND a.APPL_START_TERM IN ('$TRAD_APP_TERM');
 "@
     $auth_dataset = Get-SQLData -sql $sql -source $COLLEAGUE_SQL_SOURCE -database $COLLEAGUE_SQL_DATABASE
 
@@ -238,19 +190,7 @@ function Get-ColleagueAuthenication {
         , CONVERT(DATE, '$auth_date') AS [MAILING_CORR_RECVD_ASGN_DT]
         , INITIAL_PASSWORD AS [MAILING_CORR_RECVD_STATUS]
         FROM X_AD_CRED
-        WHERE PERSON_PIN_USER_ID = '$username'
-        AND PERSON_PIN_ID IN (
-            '0354815'
-            , '0354879'
-            , '0414777'
-            , '0417155'
-            , '0427535'
-            , '0431167'
-            , '0431646'
-            , '0432952'
-            , '0435032'
-            , '0441383'
-        );
+        WHERE PERSON_PIN_USER_ID = '$username';
 "@
 
         if ($pw_dataset) {
