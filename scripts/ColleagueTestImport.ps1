@@ -200,14 +200,15 @@ foreach ($score in $testScores.row)
 
     # Need to check if application already processed
     $need_to_import = -Not (Get-TestScoreInJson($score))
-    
+
     if ($need_to_import) {
         
         # Import Application
         #$scoreImported = $true
         $data = $score | ConvertTo-Json
+        Write-Host "$data"
         $importResponse = Import-TestScore $COLLEAGUE_API_URI $ColleagueCredentials $data
-
+        Write-Host "$importResponse"
         # Record imported file
         if ($null -ne $importResponse) {
             Add-TestRecord $score
