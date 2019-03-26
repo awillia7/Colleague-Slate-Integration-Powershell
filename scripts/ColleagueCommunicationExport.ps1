@@ -207,6 +207,25 @@ function Get-ColleagueAuthenication {
 
     return $auth_dataset
 }
+
+# Retrieve needed non-course information and push over as interaction
+function Get-ColleagueNonCourseData {
+    # Query for HSFL non-course records
+    $sql = @"
+    SELECT aro.APP_REC_CRM_IDS AS [SLATE_ID]
+    , 'mvnu_hsfl' AS [MAILING_CORR_RECEIVED]
+    , STNC_START_DATE AS [MAILING_CORR_RECVD_ASGN_DT]
+    , 'Completed' AS [MAILING_CORR_RECVD_STATUS]
+    FROM STUDENT_NON_COURSES AS snc
+    INNER JOIN APP_REC_ORGS AS aro ON aro.APPLICANTS_ID = snc.STNC_PERSON_ID
+        AND APP_REC_ORG_IDS = 'SLATE'
+    WHERE snc.STNC_NON_COURSE = 'HSFL'
+    AND snc.STNC_SCORE = 2
+"@
+
+    return Get-SQLData -sql $sql -source $COLLEAGUE_SQL_SOURCE -database $COLLEAGUE_SQL_DATABASE
+}
+
 #endregion
 
 # SFTP to Slate
@@ -253,6 +272,9 @@ $dataset.Tables[0].Merge($award_status.Tables[0])
 
 $colleague_auth = Get-ColleagueAuthenication
 $dataset.Tables[0].Merge($colleague_auth.Tables[0])
+
+$noncourse_data = Get-ColleagueNonCourseData
+$dataset.Tables[0].Merge($noncourse_data.Tables[0])
 
 if ($dataset.Tables[0].Rows.Count -gt 0)
 {

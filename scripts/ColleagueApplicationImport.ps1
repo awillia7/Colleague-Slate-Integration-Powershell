@@ -322,9 +322,9 @@ foreach ($app in $applications.row)
 # Colleague to Slate Process
 #region
 
-if ($SFTP_FLAG -eq 1) {
-    Add-SFTPFiles
-    Invoke-SFTPToSlate
-}
+#if ($SFTP_FLAG -eq 1) {
+    #Add-SFTPFiles
+    #Invoke-SFTPToSlate
+#}
 
 #endregion
