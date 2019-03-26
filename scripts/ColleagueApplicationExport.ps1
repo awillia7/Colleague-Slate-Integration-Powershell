@@ -105,7 +105,7 @@ if ($dataset.Tables[0].Rows.Count -gt 0)
 {
     $path = $SFTP_SOURCE_PATH + "CollToSlate_$(Get-Date -f yyyy-MM-dd_HH_mm_ss).csv"
     $dataset.Tables[0] | Export-Csv -Path $path -NoTypeInformation
-    #Invoke-SFTPToSlate "CollToSlate*.csv"
+    Invoke-SFTPToSlate "CollToSlate*.csv"
 }
 
 #endregion
