@@ -212,7 +212,7 @@ foreach ($score in $testScores.row)
         #$scoreImported = $true
         $data = $score | ConvertTo-Json
         
-        #$importResponse = Import-TestScore $COLLEAGUE_API_URI $ColleagueCredentials $data
+        $importResponse = Import-TestScore $COLLEAGUE_API_URI $ColleagueCredentials $data
         
         # Record imported file
         if ($null -ne $importResponse) {
