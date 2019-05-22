@@ -185,8 +185,13 @@ $testScores = Get-TestScores $SLATE_TEST_SCORES_API_URI $SlateCredentials
 #$lastTest = $null
 #$scoreImported = $false
 
+$i = 0
+$total = $testScores.row.count
 foreach ($score in $testScores.row)
 {
+    # Update Counter
+    $i = $i + 1
+
     # FTP Test imported
     #if ($lastTest -and $lastTest -ne $score.TestId -and $scoreImported) {
         # Add code to sftp import date
@@ -207,14 +212,18 @@ foreach ($score in $testScores.row)
         #$scoreImported = $true
         $data = $score | ConvertTo-Json
         
-        $importResponse = Import-TestScore $COLLEAGUE_API_URI $ColleagueCredentials $data
+        #$importResponse = Import-TestScore $COLLEAGUE_API_URI $ColleagueCredentials $data
         
         # Record imported file
         if ($null -ne $importResponse) {
             
             Add-TestRecord $score
         }
-    } 
+
+        "Test $i of $total imported!"
+    } else {
+        "Test $i of $total skipped!"
+    }
 }
 
 #if ($SFTP_FLAG -eq 1 -and $scoreImported) {
