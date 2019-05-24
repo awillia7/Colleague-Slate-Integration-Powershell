@@ -123,7 +123,14 @@ function Add-TestRecord($ts) {
     
     $oldApps = Get-Content -Raw -Path $JSON_DATA | ConvertFrom-Json
     $oldApps.TestScores += $testData
-    $oldApps | ConvertTo-Json | Out-File -FilePath $JSON_DATA 
+    $oldApps | ConvertTo-Json | Out-File -FilePath $JSON_DATA
+    
+    $backup = $JSON_DATA + ".bak"
+    if (Get-Content $JSON_DATA -ne $null) {
+        Copy-Item $JSON_DATA -Destination $backup
+    } else {
+        Copy-Item $backup -Destination $JSON_DATA
+    }
 }
 
 function Add-SFTPFiles() {
