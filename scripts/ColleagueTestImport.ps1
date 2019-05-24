@@ -126,10 +126,10 @@ function Add-TestRecord($ts) {
     $oldApps | ConvertTo-Json | Out-File -FilePath $JSON_DATA
     
     $backup = $JSON_DATA + ".bak"
-    if (Get-Content $JSON_DATA -ne $null) {
-        Copy-Item $JSON_DATA -Destination $backup
-    } else {
+    if ($null -eq (Get-Content $JSON_DATA)) {
         Copy-Item $backup -Destination $JSON_DATA
+    } else {
+        Copy-Item $JSON_DATA -Destination $backup
     }
 }
 
