@@ -230,13 +230,13 @@ function Get-ColleagueAthleticAwardsData {
     $sql = @"
     SELECT aro.APP_REC_CRM_IDS AS [SLATE_ID]
     , fa_list.SA_AWARD AS [MAILING_CORR_RECEIVED]
-    , fa_list.SA_DATE AS [MAILING_CORR_RECVD_ASSN_DT]
+    , fa_list.SA_DATE AS [MAILING_CORR_RECVD_ASGN_DT]
     , 'Completed' AS [MAILING_CORR_RECVD_STATUS]
-    FROM F19_AWARD_LIST AS fa_list
+    FROM ${AWARD_TABLE}_AWARD_LIST AS fa_list
     INNER JOIN AWARDS ON fa_list.SA_AWARD = AWARDS.AW_ID
     INNER JOIN APP_REC_ORGS AS aro ON aro.APPLICANTS_ID = fa_list.SA_STUDENT_ID
         AND APP_REC_ORG_IDS = 'SLATE'
-    WHERE SA_AWARD IN ('IM-BA','IM-ES','IJMBB','IM-LA','IM-BB','IM-GF','IM-SC','IM-TN','IM-TF','IM-CC','IW-SB','IW-VB','IW-BB','IW-GF','IW-SC','IW-TF','IW-CC')
+    WHERE SA_AWARD IN (${ATHLETE_AWARDS})
     AND SA_ACTION = 'A'
 "@
 
@@ -292,6 +292,9 @@ $dataset.Tables[0].Merge($colleague_auth.Tables[0])
 
 $noncourse_data = Get-ColleagueNonCourseData
 $dataset.Tables[0].Merge($noncourse_data.Tables[0])
+
+$athlete_award_data = Get-ColleagueAthleticAwardsData
+$dataset.Tables[0].Merge($athlete_award_data.Tables[0])
 
 if ($dataset.Tables[0].Rows.Count -gt 0)
 {
