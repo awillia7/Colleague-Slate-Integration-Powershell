@@ -10,7 +10,6 @@ Get-Content ($PSScriptRoot + "/../.env") | ForEach-Object {
 
 $SFTP_SOURCE_PATH = $PSScriptRoot + "/../sftp/"
 $SFTP_DESTINATION_PATH = "/incoming/colleague/tests/"
-# Read SFTP_USERNAME, SFTP_PASSWORD, and SFTP_FLAG from .env
 $SFTP_SECURE_PASSWORD = $SFTP_PASSWORD | ConvertTo-SecureString -AsPlainText -Force
 
 $JSON_DATA = $PSScriptRoot + "/../test_scores/data.json"
@@ -133,26 +132,15 @@ function Add-TestRecord($ts) {
     }
 }
 
-function Add-SFTPFiles() {
-    $sftp_tests_data = Get-Content $JSON_DATA | ConvertFrom-Json
-    $csv_tests = @()
-    $new_info = $false
-    
-    foreach ($test in $sftp_tests_data.TestScores)
-    {
-        if ($null -ne $test.ErpId)
-        {
-            $new_info = $true
-            $csv_tests += $test
-        }
+function Add-SFTPFiles($test, $person) {
+    $test_data = New-Object psobject -Property @{
+        TestId = $test
+        ErpId = $person
     }
 
-    if ($new_info)
-    {
-        # SFTP csv file
-        $path = $SFTP_SOURCE_PATH + "CollTestToSlate_$(Get-Date -f yyyy-MM-dd_HH_mm_ss).csv"
-        $csv_tests | Export-Csv -Path $path -NoTypeInformation
-    }
+    # SFTP csv file
+    $path = $SFTP_SOURCE_PATH + "CollTestToSlate_$(Get-Date -f yyyy-MM-dd_HH_mm_ss).csv"
+    $test_data | Select-Object TestId, ErpId | Export-Csv -Path $path -NoTypeInformation
 }
 
 #endregion
@@ -160,7 +148,7 @@ function Add-SFTPFiles() {
 # SFTP to Slate
 #region
 
-function Invoke-SFTPToSlate() {
+function Invoke-SFTPToSlate($sftp_filter) {
     # Must install in administrator mode
     # Install-Module -Name Posh-SSH
     $credentials = New-Object -TypeName System.Management.Automation.PSCredential `
@@ -169,9 +157,9 @@ function Invoke-SFTPToSlate() {
     $session = New-SFTPSession -ComputerName $SFTP_HOST -Credential $credentials -AcceptKey
     
     #Upload the files to the SFTP path
-    $files = Get-ChildItem  -Path $SFTP_SOURCE_PATH -Filter "CollTestToSlate*.csv"
+    $files = Get-ChildItem  -Path $SFTP_SOURCE_PATH -Filter $sftp_filter
     foreach ($file in $files) {
-        $file = $PSScriptRoot + "/../sftp/" + $file
+        $file = "../sftp/" + $file
         Set-SFTPFile -SessionId $session.SessionId -LocalFile $file -RemotePath $SFTP_DESTINATION_PATH
         Remove-Item -Path $file
     }
@@ -189,8 +177,8 @@ function Invoke-SFTPToSlate() {
 #region
 
 $testScores = Get-TestScores $SLATE_TEST_SCORES_API_URI $SlateCredentials
-#$lastTest = $null
-#$scoreImported = $false
+$lastTest = $null
+$lastPerson = $null
 
 $i = 0
 $total = $testScores.row.count
@@ -200,15 +188,15 @@ foreach ($score in $testScores.row)
     $i = $i + 1
 
     # FTP Test imported
-    #if ($lastTest -and $lastTest -ne $score.TestId -and $scoreImported) {
+    if ($lastTest -and $lastTest -ne $score.TestId) {
         # Add code to sftp import date
-        #$scoreImported = $false
-        #if ($SFTP_FLAG -eq 1) {
-            #Add-SFTPFiles
-            #Invoke-SFTPToSlate
-        #}
-    #}
-    #$lastTest = $score.TestId
+        if ($SFTP_FLAG -eq 1) {
+            Add-SFTPFiles $lastTest $lastPerson
+            Invoke-SFTPToSlate "CollTestToSlate*.csv"
+        }
+    }
+    $lastTest = $score.TestId
+    $lastPerson = $score.ErpProspectId
 
     # Need to check if application already processed
     $need_to_import = -Not (Get-TestScoreInJson($score))
@@ -216,7 +204,6 @@ foreach ($score in $testScores.row)
     if ($need_to_import) {
         
         # Import Application
-        #$scoreImported = $true
         $data = $score | ConvertTo-Json
         
         $importResponse = Import-TestScore $COLLEAGUE_API_URI $ColleagueCredentials $data
@@ -233,9 +220,9 @@ foreach ($score in $testScores.row)
     }
 }
 
-#if ($SFTP_FLAG -eq 1 -and $scoreImported) {
-    #Add-SFTPFiles
-    #Invoke-SFTPToSlate
-#}
+if ($lastTest -and $SFTP_FLAG -eq 1) {
+    Add-SFTPFiles  $lastTest $lastPerson
+    Invoke-SFTPToSlate "CollTestToSlate*.csv"
+}
 
 #endregion
