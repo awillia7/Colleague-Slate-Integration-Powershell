@@ -132,15 +132,15 @@ function Add-TestRecord($ts) {
     }
 }
 
-function Add-SFTPFiles($test, $person) {
+function Add-SFTPFiles($test, $person, $filename) {
     $test_data = New-Object psobject -Property @{
         TestId = $test
         ErpId = $person
     }
 
     # SFTP csv file
-    $path = $SFTP_SOURCE_PATH + "CollTestToSlate_$(Get-Date -f yyyy-MM-dd_HH_mm_ss).csv"
-    $test_data | Select-Object TestId, ErpId | Export-Csv -Path $path -NoTypeInformation
+    $path = $SFTP_SOURCE_PATH + $filename
+    $test_data | Select-Object TestId, ErpId | Export-Csv -Path $path -NoTypeInformation -Append
 }
 
 #endregion
@@ -179,6 +179,7 @@ function Invoke-SFTPToSlate($sftp_filter) {
 $testScores = Get-TestScores $SLATE_TEST_SCORES_API_URI $SlateCredentials
 $lastTest = $null
 $lastPerson = $null
+$filename = $null
 
 $i = 0
 $total = $testScores.row.count
@@ -191,8 +192,10 @@ foreach ($score in $testScores.row)
     if ($lastTest -and $lastTest -ne $score.TestId) {
         # Add code to sftp import date
         if ($SFTP_FLAG -eq 1) {
-            Add-SFTPFiles $lastTest $lastPerson
-            Invoke-SFTPToSlate "CollTestToSlate*.csv"
+            if (-not $filename) {
+                $filename = "CollTestToSlate_$(Get-Date -f yyyy-MM-dd_HH_mm_ss).csv"
+            }
+            Add-SFTPFiles $lastTest $lastPerson $filename
         }
     }
     $lastTest = $score.TestId
@@ -221,7 +224,10 @@ foreach ($score in $testScores.row)
 }
 
 if ($lastTest -and $SFTP_FLAG -eq 1) {
-    Add-SFTPFiles  $lastTest $lastPerson
+    if (-not $filename) {
+        $filename = "CollTestToSlate_$(Get-Date -f yyyy-MM-dd_HH_mm_ss).csv"
+    }
+    Add-SFTPFiles  $lastTest $lastPerson $filename
     Invoke-SFTPToSlate "CollTestToSlate*.csv"
 }
 
