@@ -1,7 +1,5 @@
 applications/*
 !applications/.gitkeep
-test_scores/*
-!test_scores/.gitkeep
 logs/*
 !logs/.gitkeep
 sftp/*
