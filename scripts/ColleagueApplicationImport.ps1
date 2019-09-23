@@ -270,7 +270,7 @@ foreach ($app in $applications.row)
                 $email = $TRAD_EMAIL
             }
             
-            Send-MailMessage -To $email -From "no-reply@mvnu.edu" -Subject "Slate Application to Colleage Import Error" -Body $body -SmtpServer "safemx.mvnu.edu"
+            Send-MailMessage -To $email -From "no-reply@mvnu.edu" -Subject "Slate Application to Colleage Import Error" -Body $body -SmtpServer $SMTP_SERVER
         }
 
         # Record imported file
@@ -307,7 +307,7 @@ foreach ($app in $applications.row)
             
             # Send Email with error message
             $email = $NT_EMAIL
-            Send-MailMessage -To $email -From "no-reply@mvnu.edu" -Subject "Slate Application to Colleage Import Error" -Body $body -SmtpServer "safemx.mvnu.edu"
+            Send-MailMessage -To $email -From "no-reply@mvnu.edu" -Subject "Slate Application to Colleage Import Error" -Body $body -SmtpServer $SMTP_SERVER
         }
 
         # Record imported file
